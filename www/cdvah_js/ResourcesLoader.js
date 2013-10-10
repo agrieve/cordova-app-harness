@@ -3,14 +3,13 @@
 
     /* global myApp */
     myApp.factory("ResourcesLoader", [ "$window", function ($window) {
-        var fs;
+        var fs, tempFs;
         var initialised = false;
 
         function initialiseFileSystem() {
             var deferred = Q.defer();
 
             if(!initialised) {
-
                 var failedFileSystemLookUp = function (error) {
                     var errorString = "An error occurred while reading the file system.";
                     if(error) {
@@ -19,10 +18,19 @@
                     deferred.reject(new Error(errorString));
                 };
 
-                var success = function(_fs) {
-                    fs = _fs;
+                var successTemp = function(_fs) {
+                    tempFs = _fs;
                     initialised = true;
                     deferred.resolve(fs);
+                };
+
+                var success = function(_fs) {
+                    fs = _fs;
+                    try {
+                        $window.requestFileSystem($window.LocalFileSystem.TEMPORARY, 0, successTemp, failedFileSystemLookUp);
+                    } catch (e) {
+                        failedFileSystemLookUp(e);
+                    }
                 };
 
                 try {
@@ -142,12 +150,7 @@
         }
 
         function truncateToDirectoryPath(path) {
-            //remove the filename if it exists
-            var lastLevelIndex = path.search(/[\w ]+(\.[\w ]+)+$/g);
-            if(lastLevelIndex !== -1) {
-                path = path.substring(0, lastLevelIndex);
-            }
-            return path;
+            return path.replace(/\/[^\/]+$/, '/');
         }
 
         function getPathSegments(path){
@@ -229,7 +232,7 @@
                     if(xhr.status === 200) {
                         deferred.resolve(xhr);
                     } else {
-                        deferred.reject("XHR return status: " + xhr.status + " for url: " + url);
+                        deferred.reject(new Error("XHR return status: " + xhr.status + " for url: " + url));
                     }
                 }
             };
@@ -259,57 +262,15 @@
                 });
             },
 
-            // promise returns full path to file
-            getFullFilePath : function(filePath) {
+            createTempPath: function() {
                 return initialiseFileSystem()
                 .then(function(){
-                    var deferred = Q.defer();
-
-                    // Use the file's parent folder to get the full path
-                    var directory = filePath;
-                    var fileName = "";
-
-                    //remove the filename if it exists
-                    var lastLevelIndex = directory.search(/\/[\w ]+\.[\w ]+$/g);
-                    if(lastLevelIndex !== -1) {
-                        directory = filePath.substring(0, lastLevelIndex);
-                        fileName = filePath.substring(lastLevelIndex + 1);
-                    }
-
-                    //we need the directory name w.r.t the root, so remove any slashes in the beginning
-                    if(directory.charAt(0) === "/") {
-                        directory = directory.substring(1);
-                    }
-
-                    var gotFullPath = function(dirEntry) {
-                        var fullFilePath = dirEntry.fullPath + "/" + fileName;
-                        deferred.resolve(fullFilePath);
-                    };
-
-                    var failedToGetFullPath = function(error) {
-                        var str = "There was an error getting the full path of file: " + filePath + " " + JSON.stringify(error);
-                        deferred.reject(new Error(str));
-                    };
-
-                    fs.root.getDirectory(directory, {create: true, exclusive: false}, gotFullPath, failedToGetFullPath);
-                    return deferred.promise;
-                });
+                    return tempFs.root.fullPath + '/' + Math.random();
+                })
             },
 
             // returns a promise with a full path to the downloaded file
-            downloadFromUrl : function(url, filePath) {
-                var self = this;
-                return initialiseFileSystem()
-                .then(function(){
-                    return self.ensureDirectoryExists(filePath);
-                })
-                .then(function(){
-                    return self.getFullFilePath(filePath);
-                })
-                .then(function(fullFilePath){
-                    return downloadFromUrl(url, fullFilePath);
-                });
-            },
+            downloadFromUrl : downloadFromUrl,
 
             //returns a promise with the contents of the file
             readFileContents : function(fileName) {
