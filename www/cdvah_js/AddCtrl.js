@@ -13,9 +13,11 @@
         $scope.addApp = function() {
             var serviceCall = AppsService.addApp($scope.appData.installerType, $scope.appData.appUrl);
 
-            serviceCall.then(function() {
+            serviceCall.then(function(handler) {
                 console.log('successfully installed');
                 notifier.success('Successfully installed');
+                return AppsService.updateApp(handler)
+                .done();
             }, function(error) {
                 console.error(error);
                 notifier.error('Unable to add application because: ' + error.message);

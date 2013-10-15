@@ -1,3 +1,6 @@
+
+Q.longStackSupport = true;
+
 var myApp = angular.module("CordovaAppHarness", []);
 
 
@@ -18,7 +21,7 @@ document.addEventListener('deviceready', function() {
         var path = dirEntry.fullPath;
         myApp.value("INSTALL_DIRECTORY", path + "/apps");
         myApp.value("APPS_JSON", path + "/apps.json");
-        myApp.value("METADATA_JSON", path + "/metadata.json");
+        alert('booting strap');
         angular.bootstrap(document, ['CordovaAppHarness']);
     });
 }, false);

@@ -23,11 +23,10 @@
             }
         }, 250 /* Give it a priority */);
 
-        function ServeHandler(url) {
+        function ServeHandler(url, appId) {
             this.url = url;
-            this.appId = '';
-            this.isInstalled = false;
-            this.installPath = '';
+            this.appId = appId || '';
+            this.lastUpdated = null;
             this._cachedProjectJson = null;
             this._cachedConfigXml = null;
         }
@@ -42,32 +41,38 @@
                 return ResourcesLoader.xhrGet(self.url + self._cachedProjectJson['configPath']);
             })
             .then(function(xhr) {
-                self._cachedConfigXml = new DOMParser().parseFromString(xhr.responseText, 'text/xml');
-                self.appId = self._cachedConfigXml.firstChild.getAttribute('id');
+                self._cachedConfigXml = xhr.responseText;
+                var configXml = new DOMParser().parseFromString(self._cachedConfigXml, 'text/xml');
+                self.appId = configXml.firstChild.getAttribute('id');
             });
         };
 
-        ServeHandler.prototype.updateApp = function(dontUseCache) {
-            if (dontUseCache || !this._cachedConfigXml) {
-                return this._updateAppMeta()
-                .then(this.updateApp.bind(this, false));
-            }
+        // TODO: update should be more atomic. Maybe download to a new directory?
+        ServeHandler.prototype.updateApp = function(installPath) {
             var self = this;
-            var wwwPath = this._cachedProjectJson['wwwPath'];
-            var files = this._cachedProjectJson['wwwFileList'];
-            var i = 0;
-            function downloadNext() {
-                if (!files[i]) {
-                    return;
+            return this._updateAppMeta()
+            .then(function() {
+                var wwwPath = self._cachedProjectJson['wwwPath'];
+                var files = self._cachedProjectJson['wwwFileList'];
+                var i = 0;
+                function downloadNext() {
+                    if (!files[i]) {
+                        self.lastUpdated = new Date();
+                        return;
+                    }
+                    console.log('now downloading ' + i + ' of ' + files.length);
+                    var sourceUrl = self.url + wwwPath + files[i];
+                    var destPath = installPath + '/www' + files[i];
+                    console.log(destPath);
+                    i += 1;
+                    return ResourcesLoader.downloadFromUrl(sourceUrl, destPath).then(downloadNext);
                 }
-                console.log('now downloading ' + i + ' of ' + files.length);
-                var sourceUrl = self.url + wwwPath + files[i];
-                var destPath = self.installPath + files[i];
-                console.log(destPath);
-                i += 1;
-                return ResourcesLoader.downloadFromUrl(sourceUrl, destPath).then(downloadNext);
-            }
-            return downloadNext();
+                return ResourcesLoader.ensureDirectoryExists(installPath + '/config.xml')
+                .then(function() {
+                    return ResourcesLoader.writeFileContents(installPath + '/config.xml', self._cachedConfigXml);
+                })
+                .then(downloadNext);
+            });
         };
 
         function createFromUrl(url) {
@@ -85,9 +90,14 @@
             return ret._updateAppMeta().then(function() { return ret; });
         }
 
+        function createFromJson(url, appId) {
+            return new ServeHandler(url, appId);
+        }
+
         AppsService.registerInstallHandlerFactory({
             type: 'serve',
-            createFromUrl: createFromUrl
+            createFromUrl: createFromUrl, // returns a promise.
+            createFromJson: createFromJson // does not return a promise.
         });
     }]);
 })();
