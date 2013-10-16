@@ -18,6 +18,18 @@
             return deferred.promise;
         }
 
+        function setResetUrl(url) {
+            var deferred = Q.defer();
+            cordova.plugins.appBundle.setResetUrl(url, deferred.resolve);
+            return deferred.promise;
+        }
+
+        function injectJsForUrl(url, js) {
+            var deferred = Q.defer();
+            cordova.plugins.appBundle.injectJsForUrl(url, js, deferred.resolve);
+            return deferred.promise;
+        }
+
         function reset() {
             var deferred = Q.defer();
             cordova.plugins.appBundle.clearAllAliases(deferred.resolve);
@@ -30,7 +42,9 @@
 
         return {
             aliasUri: aliasUri,
-            reset: reset
+            reset: reset,
+            setResetUrl: setResetUrl,
+            injectJsForUrl: injectJsForUrl
         };
 
     }]);

@@ -1,7 +1,7 @@
 (function(){
     "use strict";
     /* global myApp */
-    myApp.controller("ListCtrl", [ "AppBundle", "notifier", "$rootScope", "$scope", "$location", "$routeParams", "AppsService", function (AppBundle, notifier, $rootScope, $scope, $location, $routeParams, AppsService) {
+    myApp.controller("ListCtrl", [ "AppBundle", "notifier", "$rootScope", "$scope", "$routeParams", "AppsService", function (AppBundle, notifier, $rootScope, $scope, $routeParams, AppsService) {
         $scope.appList = [];
         $rootScope.appTitle = 'Cordova App Harness';
 

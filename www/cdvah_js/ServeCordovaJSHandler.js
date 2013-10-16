@@ -1,7 +1,7 @@
 (function(){
     "use strict";
     /* global myApp */
-    myApp.run(["AppBundle", "AppsService", "ResourcesLoader", "ContextMenuInjectScript", function(AppBundle, AppsService, ResourcesLoader, ContextMenuInjectScript){
+    myApp.run(["$location", "AppBundle", "AppsService", "ResourcesLoader", "ContextMenuInjectScript", function($location, AppBundle, AppsService, ResourcesLoader, ContextMenuInjectScript){
         var platformId = cordova.platformId;
 
         function ServeHandler(url, appId) {
@@ -60,18 +60,26 @@
             });
         };
 
-        ServeHandler.prototype.prepareForLaunch = function(installPath) {
-            return AppBundle.reset()
+        ServeHandler.prototype.prepareForLaunch = function(installPath, launchUrl) {
+            var harnessUrl = cordova.require('cordova/urlutil').makeAbsolute(location.pathname);
+            var harnessDir = harnessUrl.replace(/\/[^\/]*$/, '');
+            var installUrl = cordova.require('cordova/urlutil').makeAbsolute(installPath);
+            var injectString = ContextMenuInjectScript.getInjectString()
+            // Inject the context menu script for all pages except the harness menu.
+            return AppBundle.injectJsForUrl('^(?!' + harnessUrl + ')', injectString)
             .then(function() {
-                // Make any direct references to the bundle paths such as file:///android_asset point to the installed location.
-                // {BUNDLE_WWW} in the regex is automatically replaced by the appBundle component
-                return AppBundle.aliasUri("^{BUNDLE_WWW}", "^{BUNDLE_WWW}", installPath + '/www', false /* redirect */);
+                // Allow navigations back to the menu.
+                return AppBundle.setResetUrl('^' + harnessUrl);
             })
             .then(function() {
-                return AppBundle.aliasUri('/cordova\\.js.*', '.+', location.href.replace(/\/www\/.*/, '/www/cordova.js'), false /* redirect */);
+                // Make any references to www/ point to the app's install location.
+                return AppBundle.aliasUri('^' + harnessDir, '^' + harnessDir, installUrl + '/www', false /* redirect */);
             })
             .then(function() {
-                return AppBundle.aliasUri('/cordova_plugins\\.js.*', '.+', location.href.replace(/\/www\/.*/, '/www/cordova_plugins.js'), false /* redirect */);
+                return AppBundle.aliasUri('/cordova\\.js.*', '.+', harnessDir + '/cordova.js', false /* redirect */);
+            })
+            .then(function() {
+                return AppBundle.aliasUri('/cordova_plugins\\.js.*', '.+', harnessDir + '/cordova_plugins.js', false /* redirect */);
             });
         };
 
