@@ -6,8 +6,6 @@
         var platformId = cordova.platformId;
         // Map of type -> handler.
         var _installHandlerFactories = {};
-        // functions to run before launching an app
-        var preLaunchHooks = [];
 
         var _installHandlers = null;
         var _lastLaunchedAppId = null;
@@ -147,25 +145,17 @@
             },
 
             launchApp : function(handler) {
-                var appEntry;
-                var startLocation;
                 _lastLaunchedAppId = handler.appId;
                 return writeAppsJson()
                 .then(function(){
                     return getAppPathsForHandler(handler);
                 })
                 .then(function(appPaths){
-                    startLocation = appPaths.startLocation;
-                    var result = Q.resolve(0 /* dummy value to set up chain */);
-                    preLaunchHooks.forEach(function (currHook) {
-                        result = result.then(function(){
-                            return currHook.handler(appEntry, appPaths.appInstallLocation, appPaths.platformWWWLocation);
-                        });
+                    var installPath = INSTALL_DIRECTORY + '/' + handler.appId;
+                    return handler.prepareForLaunch(installPath)
+                    .then(function(startLocation) {
+                        window.location = appPaths.startLocation;
                     });
-                    return result;
-                })
-                .then(function() {
-                    window.location = startLocation;
                 });
             },
 
@@ -199,20 +189,13 @@
             updateApp : function(handler){
                 return Q.fcall(function() {
                     var installPath = INSTALL_DIRECTORY + '/' + handler.appId;
-                    return handler.updateApp(installPath);
+                    return handler.updateApp(installPath)
+                    .then(writeAppsJson);
                 });
             },
 
             registerInstallHandlerFactory : function(handlerFactory) {
                 _installHandlerFactories[handlerFactory.type] = handlerFactory;
-            },
-
-            addPreLaunchHook : function(handler, priority){
-                if(!priority) {
-                    // Assign a default priority
-                    priority = 500;
-                }
-                insertObjectAtPriority(preLaunchHooks, handler, priority);
             }
         };
     }]);
